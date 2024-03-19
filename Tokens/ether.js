@@ -1,19 +1,21 @@
 
 require('dotenv').config();
-const {Web3}  = require('web3');
+const { Web3 } = require('web3');
+const cliProgress = require('cli-progress');
 const web3 = new Web3(`${process.env.ETH_RPC_URL}`);
-const fs= require('fs');
+const fs = require('fs');
+const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
 async function getBlockNumberFromDate(date) {
     try {
         const targetTimestamp = Math.floor(date.getTime() / 1000);
         const latestBlockNumber = Number(await web3.eth.getBlockNumber());
-  
+
         let left = 0; // Starting block number
         let right = latestBlockNumber; // Latest block number
         let closestBlockNumber = null;
         let closestTimestampDiff = Infinity;
-  
+
         while (left <= right) {
             const mid = Math.floor((left + right) / 2);
             const block = await web3.eth.getBlock(mid);
@@ -23,12 +25,12 @@ async function getBlockNumberFromDate(date) {
             }
             const blockTimestamp = Number(block.timestamp);
             const timestampDiff = Math.abs(blockTimestamp - targetTimestamp);
-  
+
             if (timestampDiff < closestTimestampDiff) {
                 closestTimestampDiff = timestampDiff;
                 closestBlockNumber = mid;
             }
-  
+
             if (blockTimestamp === targetTimestamp) {
                 // If exact match found, return the block number
                 return mid;
@@ -38,22 +40,24 @@ async function getBlockNumberFromDate(date) {
                 right = mid - 1;
             }
         }
-  
-        return closestBlockNumber; 
+
+        return closestBlockNumber;
     } catch (error) {
         console.error('Error fetching block number from date:', error);
         return null;
     }
-  }
+}
 async function getTx(adrs, startBlock, endBlock) {
     const transactions = [];
 
     const fromBlock = await getBlockNumberFromDate(startBlock);
     const toBlock = await getBlockNumberFromDate(endBlock);
-
+    console.log(`From block ${fromBlock} To Block ${toBlock}`);
+    console.log(`Total blocks to process ${toBlock - fromBlock}`);
+    bar1.start(toBlock - fromBlock, 0);
     // Define the batch size
     const batchSize = 30;
-    const givenAddress=adrs.toLowerCase();
+    const givenAddress = adrs.toLowerCase();
     // Process blocks in batches
     for (let i = fromBlock; i <= toBlock; i += batchSize) {
         const batchEndBlock = Math.min(i + batchSize, toBlock);
@@ -63,7 +67,6 @@ async function getTx(adrs, startBlock, endBlock) {
         for (let j = i; j <= batchEndBlock; j++) {
             blockPromises.push(web3.eth.getBlock(j, true));
         }
-
         // Wait for all blocks to be fetched
         const blocks = await Promise.all(blockPromises);
 
@@ -89,19 +92,21 @@ async function getTx(adrs, startBlock, endBlock) {
                 });
             }
         });
+        bar1.update(i - fromBlock + batchSize);
     }
+    bar1.stop();
     const outputData = transactions.map((transaction) => JSON.stringify(transaction)).join('\n');
-        fs.writeFile('logs/outputEth.txt',outputData , err=>{
-          
-          if(err){
-        console.err; 
-        return; 
-          }
-          else{
+    fs.writeFile('logs/outputEth.txt', outputData, err => {
+
+        if (err) {
+            console.err;
+            return;
+        }
+        else {
             console.log('');
             console.log('Access Transaction details in outputEth.txt');
             console.log('Written to file successfully');
-          }
-        });
-  }
-  module.exports={getTx};
+        }
+    });
+}
+module.exports = { getTx };

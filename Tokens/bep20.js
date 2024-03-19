@@ -1,21 +1,21 @@
 
 require('dotenv').config();
-const {Web3}  = require('web3');
+const { Web3 } = require('web3');
 const web3 = new Web3(`${process.env.BEPTOKEN_RPC_URL}`);
-const fs= require('fs');
-const {tokenContractDetailsBEP20,bepAbi } = require('../config/config.js');
+const fs = require('fs');
+const { tokenContractDetailsBEP20, bepAbi } = require('../config/config.js');
 
 
 async function getBlockNumberFromDate(date) {
     try {
         const targetTimestamp = Math.floor(date.getTime() / 1000);
         const latestBlockNumber = Number(await web3.eth.getBlockNumber());
-  
+
         let left = 0; // Starting block number
         let right = latestBlockNumber; // Latest block number
         let closestBlockNumber = null;
         let closestTimestampDiff = Infinity;
-  
+
         while (left <= right) {
             const mid = Math.floor((left + right) / 2);
             const block = await web3.eth.getBlock(mid);
@@ -25,12 +25,12 @@ async function getBlockNumberFromDate(date) {
             }
             const blockTimestamp = Number(block.timestamp);
             const timestampDiff = Math.abs(blockTimestamp - targetTimestamp);
-  
+
             if (timestampDiff < closestTimestampDiff) {
                 closestTimestampDiff = timestampDiff;
                 closestBlockNumber = mid;
             }
-  
+
             if (blockTimestamp === targetTimestamp) {
                 // If exact match found, return the block number
                 return mid;
@@ -40,23 +40,23 @@ async function getBlockNumberFromDate(date) {
                 right = mid - 1;
             }
         }
-  
-        return closestBlockNumber; 
+
+        return closestBlockNumber;
     } catch (error) {
         console.error('Error fetching block number from date:', error);
         return null;
     }
-  }
+}
 
-async function getBEPTokenTransactions(givenAddress,startBlock,endBlock) {
-  
-    let transactions=[];
+async function getBEPTokenTransactions(givenAddress, startBlock, endBlock) {
+
+    let transactions = [];
     for (const [tokenName, ContractAddress] of Object.entries(tokenContractDetailsBEP20)) {
-    const contract = new web3.eth.Contract(bepAbi, ContractAddress);
-        let sBlock=await getBlockNumberFromDate(startBlock);
-        let eBlock=await getBlockNumberFromDate(endBlock);
+        const contract = new web3.eth.Contract(bepAbi, ContractAddress);
+        let sBlock = await getBlockNumberFromDate(startBlock);
+        let eBlock = await getBlockNumberFromDate(endBlock);
         const blockRangeSize = 2000;
-        
+
         for (let fromBlock = sBlock; fromBlock <= eBlock; fromBlock += blockRangeSize) {
             const toBlock = Math.min(fromBlock + blockRangeSize, eBlock);
             // Fetch logs for Transfer events for the current block
@@ -65,31 +65,34 @@ async function getBEPTokenTransactions(givenAddress,startBlock,endBlock) {
                 fromBlock: fromBlock,
                 toBlock: toBlock
             });
-    
-             //Print transfer events for the current block
-           for (const log of logs) {
-            let type;
+
+            //Print transfer events for the current block
+            for (const log of logs) {
+                let type;
                 if (log.returnValues.from === givenAddress) {
                     type = 'Withdrawal';
                 } else if (log.returnValues.to === givenAddress) {
                     type = 'Deposit';
                 }
-            if(log.returnValues.from === givenAddress || log.returnValues.to === givenAddress){
-                transactions.push({BlockNumber: log.blockNumber,
-                TransactionHash:log.transactionHash,
-                From: log.returnValues.from,
-                To: log.returnValues.to,
-                TransactionValue: `${log.returnValues.value} ${tokenName}`,
-                Type: type});
+                if (log.returnValues.from === givenAddress || log.returnValues.to === givenAddress) {
+                    transactions.push({
+                        BlockNumber: log.blockNumber,
+                        TransactionHash: log.transactionHash,
+                        From: log.returnValues.from,
+                        To: log.returnValues.to,
+                        TransactionValue: `${log.returnValues.value} ${tokenName}`,
+                        Type: type
+                    });
+                }
             }
-        }}
+        }
     }
     const stringifyTransactions = transactions.map(transaction => ({
         //... is the spread syntax in JavaScript. It is used to expand elements of an iterable (like an array) or properties of an object into places where multiple elements or properties are expected.
         ...transaction,
         TransactionValue: transaction.TransactionValue.toString()
     }));
-    
+
     // Serialize the array of transactions to a JSON-like string
     const jsonData = stringifyTransactions.map(transaction => {
         return `{
@@ -101,7 +104,7 @@ async function getBEPTokenTransactions(givenAddress,startBlock,endBlock) {
         "Type":"${transaction.Type}"
     }`;
     }).join(',\n');
-    
+
     // Write the JSON-like string to the file
     fs.writeFile('logs/outputBep.txt', `[${jsonData}]`, err => {
         if (err) {
@@ -113,7 +116,7 @@ async function getBEPTokenTransactions(givenAddress,startBlock,endBlock) {
             console.log('Written to file successfully');
         }
     });
-    } 
+}
 
-   
-    module.exports={getBEPTokenTransactions};
+
+module.exports = { getBEPTokenTransactions };

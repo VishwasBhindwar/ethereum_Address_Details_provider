@@ -1,16 +1,16 @@
 
-const gbt= require('./Tokens/bep20.js');
-const gerct=require('./Tokens/erc20.js');
-const geteth=require('./Tokens/ether.js');
+const bep20 = require('./Tokens/bep20.js');
+const erc20 = require('./Tokens/erc20.js');
+const eth = require('./Tokens/ether.js');
 
 
 //test
-async function getAllTransactions(adrs,startBlock,endBlock) {
+async function getAllTransactions(address, startBlock, endBlock) {
     try {
         await Promise.all([
-            geteth.getTx(adrs,startBlock,endBlock),
-            gerct.getERCTokenTransactions(adrs,startBlock,endBlock),
-            gbt.getBEPTokenTransactions(adrs,startBlock,endBlock)
+            eth.getTx(address, startBlock, endBlock),
+            erc20.getERCTokenTransactions(address,startBlock,endBlock),
+            bep20.getBEPTokenTransactions(address,startBlock,endBlock)
         ]);
         console.log('All transactions processed successfully.');
     } catch (error) {
@@ -18,10 +18,10 @@ async function getAllTransactions(adrs,startBlock,endBlock) {
     }
 }
 //change accordingly
-const adrs = '0x3ddc0D8b59C05CAe4e4102307305Cf3fBE7cd01C';
-let startBlock = new Date(2024,1,28,0,0,0);//january is 0 and December is 11 
-let endBlock = new Date(2024,1,29,0,0,0);
-getAllTransactions(adrs,startBlock,endBlock);
+const address = '0x3257eFF4bDCb74B6Ebf8F0F4C67F5d15288Cf97C';
+let startBlock = new Date(2024, 2, 17, 0, 0, 0);//january is 0 and December is 11 
+let endBlock = new Date(2024, 2, 17, 1, 0, 0);
+getAllTransactions(address, startBlock, endBlock);
 
 
 
