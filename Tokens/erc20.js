@@ -1,9 +1,10 @@
 
 require('dotenv').config();
 const { Web3 } = require('web3');
+const cliProgress = require('cli-progress');
 const web3 = new Web3(`${process.env.ERC_TOKEN_RPC_URL}`);
-const fs = require('fs');
 const { tokenContractDetailsERC20, ercAbi } = require('../config/config.js');
+const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
 async function getBlockNumberFromDate(date) {
     try {
@@ -47,15 +48,18 @@ async function getBlockNumberFromDate(date) {
     }
 }
 
-async function getERCTokenTransactions(Adrs, startBlock, endBlock) {
+async function getERCTokenTransactions(Address, startBlock, endBlock) {
     let transactions = [];
+    const tokenCount = Object.keys(tokenContractDetailsERC20).length; // Get total number of tokens
+    console.log(`\n${tokenCount} Tokens to process, for Erc20`);
+    bar1.start(tokenCount, 0);
+    let sBlock = await getBlockNumberFromDate(startBlock);
+    let eBlock = await getBlockNumberFromDate(endBlock);
+    const blockRangeSize = 2000;
     for (const [tokenName, ContractAddress] of Object.entries(tokenContractDetailsERC20)) {
         const contract = new web3.eth.Contract(ercAbi, ContractAddress);
-
-        let sBlock = await getBlockNumberFromDate(startBlock);
-        let eBlock = await getBlockNumberFromDate(endBlock);
-        let givenAddress = Adrs;
-        const blockRangeSize = 2000;
+        
+        let givenAddress = Address;
         for (let fromBlock = sBlock; fromBlock <= eBlock; fromBlock += blockRangeSize) {
             const toBlock = Math.min(fromBlock + blockRangeSize, eBlock);
             // Fetch logs for Transfer events for the current block
@@ -82,39 +86,15 @@ async function getERCTokenTransactions(Adrs, startBlock, endBlock) {
                         TransactionValue: `${log.returnValues.value} ${tokenName}`,
                         Type: type
                     });
+                    
                 }
             }
         }
+        bar1.increment();
     }
-    const stringifyTransactions = transactions.map(transaction => ({
-        //... is the spread syntax in JavaScript. It is used to expand elements of an iterable (like an array) or properties of an object into places where multiple elements or properties are expected.
-        ...transaction,
-        TransactionValue: transaction.TransactionValue.toString()
-    }));
-
-    // Serialize the array of transactions to a JSON-like string
-    const jsonData = stringifyTransactions.map(transaction => {
-        return `{
-        "BlockNumber": ${transaction.BlockNumber},
-        "TransactionHash": "${transaction.TransactionHash}",
-        "From": "${transaction.From}",
-        "To": "${transaction.To}",
-        "TransactionValue": "${transaction.TransactionValue}",
-        "Type":"${transaction.Type}"
-    }`;
-    }).join(',\n');
-
-    // Write the JSON-like string to the file
-    fs.writeFile('logs/outputErc.txt', `[${jsonData}]`, err => {
-        if (err) {
-            console.error(err);
-            return;
-        } else {
-            console.log('');
-            console.log('Access Transaction details in outputErc.txt');
-            console.log('Written to file successfully');
-        }
-    });
+    
+    return transactions;
+    bar1.stop();
 }
 
 module.exports = { getERCTokenTransactions };

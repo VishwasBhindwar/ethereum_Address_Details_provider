@@ -1,10 +1,10 @@
 
 require('dotenv').config();
 const { Web3 } = require('web3');
+const cliProgress = require('cli-progress');
 const web3 = new Web3(`${process.env.BEPTOKEN_RPC_URL}`);
-const fs = require('fs');
 const { tokenContractDetailsBEP20, bepAbi } = require('../config/config.js');
-
+const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
 async function getBlockNumberFromDate(date) {
     try {
@@ -51,12 +51,14 @@ async function getBlockNumberFromDate(date) {
 async function getBEPTokenTransactions(givenAddress, startBlock, endBlock) {
 
     let transactions = [];
+    const tokenCount = Object.keys(tokenContractDetailsBEP20).length; // Get total number of tokens
+    console.log(`\n${tokenCount} Tokens to process, for Bep20\n`);
+    bar1.start(tokenCount, 0);
+    let sBlock = await getBlockNumberFromDate(startBlock);
+    let eBlock = await getBlockNumberFromDate(endBlock);
+    const blockRangeSize = 2000;
     for (const [tokenName, ContractAddress] of Object.entries(tokenContractDetailsBEP20)) {
         const contract = new web3.eth.Contract(bepAbi, ContractAddress);
-        let sBlock = await getBlockNumberFromDate(startBlock);
-        let eBlock = await getBlockNumberFromDate(endBlock);
-        const blockRangeSize = 2000;
-
         for (let fromBlock = sBlock; fromBlock <= eBlock; fromBlock += blockRangeSize) {
             const toBlock = Math.min(fromBlock + blockRangeSize, eBlock);
             // Fetch logs for Transfer events for the current block
@@ -86,36 +88,11 @@ async function getBEPTokenTransactions(givenAddress, startBlock, endBlock) {
                 }
             }
         }
+        bar1.increment();
     }
-    const stringifyTransactions = transactions.map(transaction => ({
-        //... is the spread syntax in JavaScript. It is used to expand elements of an iterable (like an array) or properties of an object into places where multiple elements or properties are expected.
-        ...transaction,
-        TransactionValue: transaction.TransactionValue.toString()
-    }));
-
-    // Serialize the array of transactions to a JSON-like string
-    const jsonData = stringifyTransactions.map(transaction => {
-        return `{
-        "BlockNumber": ${transaction.BlockNumber},
-        "TransactionHash": "${transaction.TransactionHash}",
-        "From": "${transaction.From}",
-        "To": "${transaction.To}",
-        "TransactionValue": "${transaction.TransactionValue}",
-        "Type":"${transaction.Type}"
-    }`;
-    }).join(',\n');
-
-    // Write the JSON-like string to the file
-    fs.writeFile('logs/outputBep.txt', `[${jsonData}]`, err => {
-        if (err) {
-            console.error(err);
-            return;
-        } else {
-            console.log('');
-            console.log('Access Transaction details in outputBep.txt');
-            console.log('Written to file successfully');
-        }
-    });
+    
+    return transactions;
+    bar1.stop();
 }
 
 

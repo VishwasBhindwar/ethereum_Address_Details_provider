@@ -3,7 +3,6 @@ require('dotenv').config();
 const { Web3 } = require('web3');
 const cliProgress = require('cli-progress');
 const web3 = new Web3(`${process.env.ETH_RPC_URL}`);
-const fs = require('fs');
 const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
 async function getBlockNumberFromDate(date) {
@@ -53,7 +52,7 @@ async function getTx(adrs, startBlock, endBlock) {
     const fromBlock = await getBlockNumberFromDate(startBlock);
     const toBlock = await getBlockNumberFromDate(endBlock);
     console.log(`From block ${fromBlock} To Block ${toBlock}`);
-    console.log(`Total blocks to process ${toBlock - fromBlock}`);
+    console.log(`${toBlock - fromBlock} Total blocks to process for ethereum`);
     bar1.start(toBlock - fromBlock, 0);
     // Define the batch size
     const batchSize = 30;
@@ -94,19 +93,8 @@ async function getTx(adrs, startBlock, endBlock) {
         });
         bar1.update(i - fromBlock + batchSize);
     }
+   
+    return transactions;
     bar1.stop();
-    const outputData = transactions.map((transaction) => JSON.stringify(transaction)).join('\n');
-    fs.writeFile('logs/outputEth.txt', outputData, err => {
-
-        if (err) {
-            console.err;
-            return;
-        }
-        else {
-            console.log('');
-            console.log('Access Transaction details in outputEth.txt');
-            console.log('Written to file successfully');
-        }
-    });
 }
 module.exports = { getTx };
